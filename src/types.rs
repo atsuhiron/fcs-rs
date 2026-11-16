@@ -2,8 +2,6 @@
 
 use std::fmt;
 
-use serde::Serialize;
-
 use crate::validate::InvalidInput;
 
 /// A position or a velocity, `[x, y, z]`. z is up and the shooter is at the origin.
@@ -114,7 +112,7 @@ pub struct Aim {
 }
 
 /// A trajectory in absolute coordinates, sampled at the steps the integrator took.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Trajectory {
     /// Sample times (s). The first is 0 (launch).
     pub t: Vec<f64>,
@@ -127,7 +125,7 @@ pub struct Trajectory {
 }
 
 /// The closest approach of the projectile to the target.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ClosestPoint {
     /// Time of the closest approach (s).
     pub t: f64,
