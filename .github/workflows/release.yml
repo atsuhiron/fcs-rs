@@ -85,9 +85,9 @@ jobs:
           archive: false
           if-no-files-found: error
 
+  # Runs on every trigger, so that the archives are checked before a tag depends on it; only a tag publishes
   release:
     needs: build
-    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -96,10 +96,27 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+          # Keep the archives as they are: without this the Windows zip is extracted into a directory
+          skip-decompress: true
 
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Check the archives
         run: |
           ls -l dist
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+          count=0
+          for path in dist/*; do
+            if [[ ! -f "$path" ]]; then
+              echo "::error::$path is not a file"
+              exit 1
+            fi
+            count=$((count + 1))
+          done
+          if [[ $count -ne 3 ]]; then
+            echo "::error::expected 3 archives, found $count"
+            exit 1
+          fi
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
