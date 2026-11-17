@@ -1,0 +1,105 @@
+# Build `lead` for the three supported platforms.
+# Pushing a tag `v<version>` (the version in Cargo.toml) publishes the archives as a GitHub release.
+# Running the workflow by hand, or a pull request that changes this file, builds and checks them without
+# publishing; they are kept as workflow artifacts.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            # Link the C runtime statically, so that lead.exe runs without the Visual C++ redistributable
+            rustflags: -C target-feature=+crt-static
+            exe: .exe
+          - os: ubuntu-latest
+            # musl gives a static binary that does not depend on the glibc version of the system
+            target: x86_64-unknown-linux-musl
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
+            exit 1
+          fi
+          echo "NAME=lead-$version-${{ matrix.target }}" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # The first example of the README. The last column is the calculation time and varies.
+      - name: Check the output
+        run: |
+          out=$("target/${{ matrix.target }}/release/lead${{ matrix.exe }}" 0.1 0.001 0.1 300 100 100 100 -10 1 0)
+          echo "$out"
+          if [[ "${out% *}" != "46.95 36.46 0.00 601.31" ]]; then
+            echo "::error::unexpected output: $out"
+            exit 1
+          fi
+
+      - name: Package
+        run: |
+          mkdir "$NAME"
+          cp "target/${{ matrix.target }}/release/lead${{ matrix.exe }}" README.md LICENSE "$NAME/"
+          if [[ "${{ runner.os }}" == Windows ]]; then
+            7z a "$NAME.zip" "$NAME" > /dev/null
+            echo "ARCHIVE=$NAME.zip" >> "$GITHUB_ENV"
+          else
+            tar -czf "$NAME.tar.gz" "$NAME"
+            echo "ARCHIVE=$NAME.tar.gz" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ARCHIVE }}
+          # Upload the archive as it is, not zipped again
+          archive: false
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
