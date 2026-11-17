@@ -9,6 +9,14 @@ It runs the same algorithm, as a single binary that needs no Python, and is over
 **The mathematical model and its derivation are described in the
 [README of the Python version](https://github.com/atsuhiron/fcs#readme)**; they are not repeated here.
 
+## Download
+
+Prebuilt binaries are attached to the [releases](https://github.com/atsuhiron/fcs-rs/releases),
+for Windows x86-64 (`x86_64-pc-windows-msvc`), Linux x86-64 (`x86_64-unknown-linux-musl`)
+and macOS on Apple silicon (`aarch64-apple-darwin`).
+Each archive holds the single executable `lead` (`lead.exe` on Windows), which needs nothing else installed:
+the Windows one links the C runtime statically, and the Linux one is a static musl binary.
+
 ## Build
 
 ```shell
@@ -16,6 +24,13 @@ cargo build --release
 ```
 
 The binary is `target/release/lead` (`lead.exe` on Windows).
+
+### Release
+
+Pushing a tag `v<version>`, where the version is the one in `Cargo.toml`, runs `.github/workflows/release.yml`.
+It builds the three binaries, checks that each prints the first example under Usage, and publishes them as a release.
+Running the workflow by hand from the Actions tab does the same without publishing;
+the archives are then kept as artifacts of the run.
 
 ## Usage
 
