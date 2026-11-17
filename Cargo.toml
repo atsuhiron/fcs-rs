@@ -1,0 +1,26 @@
+[package]
+name = "fcs"
+version = "0.1.0"
+edition = "2024"
+description = "Fire-control lead calculator: aim a drag-affected projectile at a moving target"
+license = "Apache-2.0"
+repository = "https://github.com/atsuhiron/fcs-rs"
+publish = false
+
+[lib]
+name = "fcs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lead"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+# float_roundtrip: parse numbers to the nearest f64, so the reference data is read back bit for bit
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
